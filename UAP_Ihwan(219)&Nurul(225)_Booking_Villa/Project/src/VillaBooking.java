@@ -1,12 +1,16 @@
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.FileWriter;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 
 public class VillaBooking {
+
     private JFrame frame, summaryFrame;
     private JPanel categoryPanel, menuPanel, checkoutPanel;
     private JComboBox<String> categoryComboBox;
@@ -79,12 +83,13 @@ public class VillaBooking {
         summaryFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         summaryFrame.setLayout(new BorderLayout());
 
-        String[] columnNames = {"Nama", "Jenis Kelamin", "No Telepon", "Nama Villa", "Total Pembayaran", "Kembalian"};
+        // Tambahkan kolom "Check-in" dan "Check-out"
+        String[] columnNames = {"Nama", "Jenis Kelamin", "No Telepon", "Nama Villa", "Check-in", "Check-out", "Total Pembayaran", "Kembalian"};
         tableModel = new DefaultTableModel(columnNames, 0);
         summaryTable = new JTable(tableModel);
 
         // Atur lebar kolom
-        int[] columnWidths = {150, 100, 120, 150, 150, 150};
+        int[] columnWidths = {150, 100, 120, 150, 120, 120, 150, 150};
         for (int i = 0; i < columnWidths.length; i++) {
             summaryTable.getColumnModel().getColumn(i).setPreferredWidth(columnWidths[i]);
         }
@@ -121,38 +126,52 @@ public class VillaBooking {
                 JLabel priceLabel = new JLabel("Rp. " + item.price, SwingConstants.CENTER);
                 priceLabel.setForeground(Color.BLACK);
 
-                JTextField checkInField = new JTextField(10);
-                JTextField checkOutField = new JTextField(10);
+                // Gunakan JSpinner untuk memilih tanggal
+                JSpinner checkInSpinner = new JSpinner(new SpinnerDateModel());
+                JSpinner checkOutSpinner = new JSpinner(new SpinnerDateModel());
+
+                // Set format tanggal
+                JSpinner.DateEditor checkInEditor = new JSpinner.DateEditor(checkInSpinner, "yyyy-MM-dd");
+                checkInSpinner.setEditor(checkInEditor);
+                JSpinner.DateEditor checkOutEditor = new JSpinner.DateEditor(checkOutSpinner, "yyyy-MM-dd");
+                checkOutSpinner.setEditor(checkOutEditor);
+
                 JButton addButton = new JButton("Pesan");
 
                 addButton.addActionListener(e -> {
                     try {
-                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                        LocalDate checkInDate = LocalDate.parse(checkInField.getText(), formatter);
-                        LocalDate checkOutDate = LocalDate.parse(checkOutField.getText(), formatter);
+                        // Ambil tanggal dari JSpinner
+                        Date checkInDate = (Date) checkInSpinner.getValue();
+                        Date checkOutDate = (Date) checkOutSpinner.getValue();
 
-                        long days = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
+                        // Konversi tanggal menjadi LocalDate
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                        String checkInStr = sdf.format(checkInDate);
+                        String checkOutStr = sdf.format(checkOutDate);
+
+                        LocalDate checkInLocalDate = LocalDate.parse(checkInStr);
+                        LocalDate checkOutLocalDate = LocalDate.parse(checkOutStr);
+
+                        long days = ChronoUnit.DAYS.between(checkInLocalDate, checkOutLocalDate);
                         if (days <= 0) {
                             JOptionPane.showMessageDialog(frame, "Check-out harus lebih besar dari Check-in.");
                         } else {
                             int totalPrice = (int) (item.price * days);
-                            selectedItems.add(new Item(item.name, totalPrice, item.imagePath, item.category));
+                            item.setDates(checkInLocalDate, checkOutLocalDate);
+                            item.price = totalPrice;  // Simpan harga total berdasarkan durasi menginap
+                            selectedItems.add(item);
                             JOptionPane.showMessageDialog(frame, "Pesanan ditambahkan: " + days + " hari, Total: Rp. " + totalPrice);
-
-                            if (paymentButton != null) {
-                                paymentButton.setEnabled(true);
-                            }
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(frame, "Format tanggal salah! Gunakan format yyyy-MM-dd.");
+                        JOptionPane.showMessageDialog(frame, "Format tanggal salah! Pilih tanggal dari kalender.");
                     }
                 });
 
                 JPanel bottomPanel = new JPanel();
-                bottomPanel.add(new JLabel("Check-in (yyyy-MM-dd):"));
-                bottomPanel.add(checkInField);
-                bottomPanel.add(new JLabel("Check-out (yyyy-MM-dd):"));
-                bottomPanel.add(checkOutField);
+                bottomPanel.add(new JLabel("Check-in:"));
+                bottomPanel.add(checkInSpinner);
+                bottomPanel.add(new JLabel("Check-out:"));
+                bottomPanel.add(checkOutSpinner);
                 bottomPanel.add(addButton);
 
                 itemPanel.add(imageLabel);
@@ -168,7 +187,7 @@ public class VillaBooking {
     }
 
     private void showReceipt() {
-        totalCost = selectedItems.stream().mapToInt(item -> item.price).sum();
+        totalCost = selectedItems.stream().mapToInt(item -> item.price).sum(); // Jumlahkan harga total per item
         receiptArea.setText("---- PESANAN ----\n");
         for (Item item : selectedItems) {
             receiptArea.append(item.name + " - Rp. " + item.price + "\n");
@@ -187,7 +206,9 @@ public class VillaBooking {
 
     private void showPaymentDialog() {
         String paymentInput = JOptionPane.showInputDialog("Masukkan Pembayaran:");
-        if (paymentInput == null) return;
+        if (paymentInput == null) {
+            return;
+        }
 
         try {
             int payment = Integer.parseInt(paymentInput);
@@ -228,14 +249,17 @@ public class VillaBooking {
             } else {
                 for (Item item : selectedItems) {
                     tableModel.addRow(new Object[]{
-                            nameField.getText(),
-                            genderComboBox.getSelectedItem().toString(),
-                            phoneField.getText(),
-                            item.name,
-                            "Rp. " + totalCost,
-                            "Rp. " + change
+                        nameField.getText(),
+                        genderComboBox.getSelectedItem().toString(),
+                        phoneField.getText(),
+                        item.name,
+                        item.checkInDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                        item.checkOutDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                        "Rp. " + item.price,
+                        "Rp. " + change
                     });
                 }
+
                 selectedItems.clear();
                 displayMenuItems("All");
                 receiptArea.setText("");
@@ -250,15 +274,45 @@ public class VillaBooking {
         summaryFrame.setVisible(true);
     }
 
+    private void saveSummaryToFile() {
+        try {
+            FileWriter writer = new FileWriter("summary.csv");
+            // Tulis header
+            writer.write("Nama,Jenis Kelamin,No Telepon,Nama Villa,Check-in,Check-out,Total Pembayaran,Kembalian\n");
+
+            // Tulis setiap baris dari tabel
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                    writer.write(tableModel.getValueAt(i, j).toString());
+                    if (j < tableModel.getColumnCount() - 1) {
+                        writer.write(",");
+                    }
+                }
+                writer.write("\n");
+            }
+            writer.close();
+            JOptionPane.showMessageDialog(frame, "Data berhasil disimpan ke summary.csv");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(frame, "Gagal menyimpan data: " + e.getMessage());
+        }
+    }
+
     static class Item {
+
         String name, imagePath, category;
         int price;
+        LocalDate checkInDate, checkOutDate;
 
         public Item(String name, int price, String imagePath, String category) {
             this.name = name;
             this.price = price;
             this.imagePath = imagePath;
             this.category = category;
+        }
+
+        public void setDates(LocalDate checkInDate, LocalDate checkOutDate) {
+            this.checkInDate = checkInDate;
+            this.checkOutDate = checkOutDate;
         }
     }
 }
