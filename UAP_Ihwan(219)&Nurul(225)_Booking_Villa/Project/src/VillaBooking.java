@@ -14,7 +14,7 @@ public class VillaBooking {
     private JFrame frame, summaryFrame;
     private JPanel categoryPanel, menuPanel, checkoutPanel;
     private JComboBox<String> categoryComboBox;
-    private JButton orderButton, paymentButton, viewSummaryButton;
+    private JButton orderButton, paymentButton, viewSummaryButton, deleteButton;
     private JTextArea receiptArea;
     private JTable summaryTable;
     private DefaultTableModel tableModel;
@@ -102,8 +102,32 @@ public class VillaBooking {
             summaryFrame.setVisible(false);
             frame.setVisible(true);
         });
-        summaryFrame.add(backButton, BorderLayout.SOUTH);
 
+        // Tombol Hapus Data
+        deleteButton = new JButton("Hapus Data");
+        deleteButton.addActionListener(e -> {
+            int selectedRow = summaryTable.getSelectedRow();
+            if (selectedRow != -1) {
+                int confirmation = JOptionPane.showConfirmDialog(summaryFrame, 
+                    "Apakah Anda yakin ingin menghapus data ini?", 
+                    "Konfirmasi Hapus", 
+                    JOptionPane.YES_NO_OPTION);
+                if (confirmation == JOptionPane.YES_OPTION) {
+                    tableModel.removeRow(selectedRow);
+                    JOptionPane.showMessageDialog(summaryFrame, "Data berhasil dihapus.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(summaryFrame, "Pilih data terlebih dahulu untuk dihapus.");
+            }
+        });
+
+        // Panel tombol Back dan Hapus Data
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(deleteButton);
+        buttonPanel.add(backButton);
+
+        summaryFrame.add(buttonPanel, BorderLayout.SOUTH);
         summaryFrame.setSize(1000, 600);
     }
 
@@ -140,11 +164,8 @@ public class VillaBooking {
 
                 addButton.addActionListener(e -> {
                     try {
-                        // Ambil tanggal dari JSpinner
                         Date checkInDate = (Date) checkInSpinner.getValue();
                         Date checkOutDate = (Date) checkOutSpinner.getValue();
-
-                        // Konversi tanggal menjadi LocalDate
                         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
                         String checkInStr = sdf.format(checkInDate);
                         String checkOutStr = sdf.format(checkOutDate);
@@ -272,29 +293,6 @@ public class VillaBooking {
     private void openSummaryWindow() {
         frame.setVisible(false);
         summaryFrame.setVisible(true);
-    }
-
-    private void saveSummaryToFile() {
-        try {
-            FileWriter writer = new FileWriter("summary.csv");
-            // Tulis header
-            writer.write("Nama,Jenis Kelamin,No Telepon,Nama Villa,Check-in,Check-out,Total Pembayaran,Kembalian\n");
-
-            // Tulis setiap baris dari tabel
-            for (int i = 0; i < tableModel.getRowCount(); i++) {
-                for (int j = 0; j < tableModel.getColumnCount(); j++) {
-                    writer.write(tableModel.getValueAt(i, j).toString());
-                    if (j < tableModel.getColumnCount() - 1) {
-                        writer.write(",");
-                    }
-                }
-                writer.write("\n");
-            }
-            writer.close();
-            JOptionPane.showMessageDialog(frame, "Data berhasil disimpan ke summary.csv");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(frame, "Gagal menyimpan data: " + e.getMessage());
-        }
     }
 
     static class Item {
